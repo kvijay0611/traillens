@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TrialLens - Clinical Trial Intelligence Copilot</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #131722;
+    --border: #232838;
+    --text: #e6e9ef;
+    --muted: #8b93a7;
+    --accent: #4f8cff;
+    --accent-2: #37c992;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header .tag { color: var(--muted); font-size: 13px; }
+  #metrics-link { color: var(--accent); font-size: 13px; text-decoration: none; cursor: pointer; }
+
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .msg { margin-bottom: 20px; max-width: 90%; }
+  .msg.user { margin-left: auto; text-align: right; }
+  .bubble {
+    display: inline-block;
+    padding: 12px 16px;
+    border-radius: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    text-align: left;
+  }
+  .user .bubble { background: var(--accent); color: white; }
+  .bot .bubble { background: var(--panel); border: 1px solid var(--border); }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .citations { margin-top: 8px; font-size: 12px; color: var(--accent-2); }
+
+  #inputbar {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    display: flex;
+    gap: 10px;
+  }
+  #inputbar input {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  #inputbar button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #inputbar button:disabled { opacity: 0.5; cursor: default; }
+  .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .example-chip {
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .example-chip:hover { border-color: var(--accent); color: var(--text); }
+  .loading { color: var(--muted); font-style: italic; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>TrialLens</h1>
+    <div class="tag">Clinical Trial Intelligence Copilot — live ClinicalTrials.gov + FDA FAERS</div>
+  </div>
+  <a id="metrics-link" href="/api/metrics" target="_blank">View LLMOps metrics →</a>
+</header>
+
+<div id="chat">
+  <div class="examples" id="examples"></div>
+</div>
+
+<div id="inputbar">
+  <input id="query" type="text" placeholder="Ask about a condition, drug, trial phase, or adverse events..." />
+  <button id="send">Ask</button>
+</div>
+
+<script>
+const examples = [
+  "What Phase 3 trials are recruiting for NASH?",
+  "What adverse events have been reported for semaglutide?",
+  "Are there any trials for type 2 diabetes using GLP-1 drugs?",
+  "What are the eligibility criteria for lung cancer immunotherapy trials?"
+];
+
+const chatEl = document.getElementById('chat');
+const exEl = document.getElementById('examples');
+const inputEl = document.getElementById('query');
+const sendBtn = document.getElementById('send');
+
+examples.forEach(ex => {
+  const chip = document.createElement('div');
+  chip.className = 'example-chip';
+  chip.textContent = ex;
+  chip.onclick = () => { inputEl.value = ex; sendQuery(); };
+  exEl.appendChild(chip);
+});
+
+function addMessage(role, html) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role;
+  wrap.innerHTML = `<div class="bubble">${html}</div>`;
+  chatEl.appendChild(wrap);
+  chatEl.scrollTop = chatEl.scrollHeight;
+  return wrap;
+}
+
+async function sendQuery() {
+  const q = inputEl.value.trim();
+  if (!q) return;
+  inputEl.value = '';
+  sendBtn.disabled = true;
+
+  addMessage('user', escapeHtml(q));
+  const loadingMsg = addMessage('bot', '<span class="loading">Searching trials and synthesizing...</span>');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      loadingMsg.querySelector('.bubble').innerHTML = 'Error: ' + escapeHtml(data.detail || 'request failed');
+      return;
+    }
+
+    let html = escapeHtml(data.answer).replace(/\n/g, '<br>');
+    if (data.citations && data.citations.length) {
+      html += `<div class="citations">Sources: ${data.citations.join(', ')}</div>`;
+    }
+    html += `<div class="meta">${data.latency_ms}ms · ~$${data.estimated_cost_usd} · trials: ${data.route_info.trials_found}, chunks: ${data.route_info.semantic_chunks_found}, AE records: ${data.route_info.adverse_event_records}</div>`;
+    loadingMsg.querySelector('.bubble').innerHTML = html;
+  } catch (err) {
+    loadingMsg.querySelector('.bubble').innerHTML = 'Request failed: ' + escapeHtml(String(err));
+  } finally {
+    sendBtn.disabled = false;
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+sendBtn.onclick = sendQuery;
+inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') sendQuery(); });
+</script>
+
+</body>
+</html>

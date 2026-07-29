@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: triallens
+    env: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: llama-3.3-70b-versatile
+      - key: DATABASE_PATH
+        value: /app/data/triallens.db
+      - key: CHROMA_PATH
+        value: /app/data/chroma_data
+      - key: MAX_INGEST_RESULTS
+        value: "50"
+    disk:
+      name: triallens-data
+      mountPath: /app/data
+      sizeGB: 1

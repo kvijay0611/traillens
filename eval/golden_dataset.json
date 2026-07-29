@@ -1,0 +1,60 @@
+[
+  {
+    "id": "q1",
+    "query": "What Phase 3 trials exist for NASH?",
+    "type": "structured",
+    "expected_keywords": ["NASH", "Phase 3"],
+    "requires_citation": true
+  },
+  {
+    "id": "q2",
+    "query": "What adverse events have been reported for semaglutide?",
+    "type": "adverse_events",
+    "expected_keywords": ["semaglutide"],
+    "requires_citation": false
+  },
+  {
+    "id": "q3",
+    "query": "Are there trials studying GLP-1 drugs for type 2 diabetes?",
+    "type": "structured",
+    "expected_keywords": ["GLP-1", "diabetes"],
+    "requires_citation": true
+  },
+  {
+    "id": "q4",
+    "query": "What are the eligibility criteria for lung cancer immunotherapy trials?",
+    "type": "semantic",
+    "expected_keywords": ["eligibility", "lung cancer"],
+    "requires_citation": true
+  },
+  {
+    "id": "q5",
+    "query": "What is the capital of France?",
+    "type": "out_of_domain",
+    "expected_keywords": [],
+    "requires_citation": false,
+    "expects_refusal": true
+  },
+  {
+    "id": "q6",
+    "query": "Are there any completed trials for a made-up condition called Zorblex Syndrome?",
+    "type": "no_data",
+    "expected_keywords": [],
+    "requires_citation": false,
+    "expects_refusal": true
+  },
+  {
+    "id": "q7",
+    "query": "What sponsors are running trials for pancreatic cancer immunotherapy?",
+    "type": "structured",
+    "expected_keywords": ["pancreatic", "sponsor"],
+    "requires_citation": true
+  },
+  {
+    "id": "q8",
+    "query": "What side effects are associated with metformin based on FAERS data?",
+    "type": "adverse_events",
+    "expected_keywords": ["metformin"],
+    "requires_citation": false
+  }
+]
