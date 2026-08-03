@@ -26,6 +26,24 @@ class Trial(Base):
     fetched_at = Column(DateTime, default=datetime.utcnow)
 
 
+class TrialChunk(Base):
+    """
+    Text chunks (summary + eligibility segments) used for lightweight
+    keyword-overlap retrieval -- see backend/vectorstore.py for why this
+    replaced a Chroma/embedding-model based approach.
+    """
+    __tablename__ = "trial_chunks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    nct_id = Column(String, index=True)
+    section = Column(String)
+    text = Column(Text)
+    title = Column(Text)
+    condition = Column(Text)
+    phase = Column(String)
+    status = Column(String)
+
+
 class AdverseEvent(Base):
     """Aggregated adverse-event counts from openFDA FAERS, per drug."""
     __tablename__ = "adverse_events"
