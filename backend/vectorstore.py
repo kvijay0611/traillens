@@ -1,8 +1,10 @@
 """
-Local, file-persisted vector store using Chroma + sentence-transformers.
-No external vector DB service required, so it deploys as a single web
-service on Render with zero extra infra. Swappable for pgvector/Pinecone --
-see README "Scaling this up" section.
+Local, file-persisted vector store using Chroma with its built-in ONNX
+MiniLM embedder (NOT sentence-transformers/PyTorch, which is far too heavy
+for a 512MB free-tier instance -- PyTorch alone can eat 400MB+ of RAM before
+processing a single request, and Render's free web services will OOM-kill
+the process). Chroma's default embedding function does the same job with a
+much smaller footprint.
 """
 import chromadb
 from chromadb.utils import embedding_functions
@@ -10,24 +12,11 @@ from backend.config import CHROMA_PATH
 
 _client = None
 _collection = None
-_embedder = None
 
-# Cosine distance cutoff: chunks farther than this from the query are treated
-# as irrelevant and dropped, instead of being passed to the LLM as "context."
-# Without this, a semantically weak match from a totally different trial can
-# get pulled in just because it's the "closest of what's available" -- which
-# is how unrelated NCT IDs from earlier questions ended up cited on a NASH
-# query. 0.9 is a reasonably strict cutoff for all-MiniLM-L6-v2 embeddings.
+# Lightweight ONNX-based embedder built into chromadb -- no torch required.
+_embedder = embedding_functions.DefaultEmbeddingFunction()
+
 RELEVANCE_DISTANCE_THRESHOLD = 0.9
-
-
-def _get_embedder():
-    global _embedder
-    if _embedder is None:
-        _embedder = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
-        )
-    return _embedder
 
 
 def get_collection():
@@ -35,7 +24,7 @@ def get_collection():
     if _collection is None:
         _client = chromadb.PersistentClient(path=CHROMA_PATH)
         _collection = _client.get_or_create_collection(
-            name="trial_chunks", embedding_function=_get_embedder()
+            name="trial_chunks", embedding_function=_embedder
         )
     return _collection
 
@@ -73,15 +62,9 @@ def index_trial(trial: dict):
 
 
 def semantic_search(query: str, k: int = 5) -> list[dict]:
-    """
-    Returns up to k semantically relevant chunks, filtered by a distance
-    threshold so stale/unrelated chunks from previous unrelated questions
-    don't leak into the current answer.
-    """
     collection = get_collection()
     if collection.count() == 0:
         return []
-    # Over-fetch a bit before filtering, since some results will get dropped.
     n = min(k * 3, collection.count())
     results = collection.query(query_texts=[query], n_results=n)
 
